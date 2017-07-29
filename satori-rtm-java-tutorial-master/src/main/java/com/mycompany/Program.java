@@ -1,5 +1,4 @@
 package com.mycompany;
-
 import com.google.common.util.concurrent.*;
 import com.fasterxml.jackson.annotation.*;
 import com.satori.rtm.*;
@@ -9,7 +8,6 @@ import com.sun.org.apache.regexp.internal.RE;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -24,16 +22,23 @@ public class Program {
     static private HashMap<String, Integer> languageTenMinutesHashMap = new HashMap<String, Integer>();
     static private HashMap<String, Integer> languageHourHashMap = new HashMap<String, Integer>();
     static private HashMap<String, Integer> languageDayHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> idTenMinutesHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> idHourHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> idDayHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> repoNameTenMinutesHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> repoNameHourHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> repoNameDayHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> authorTenMinutesHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> authorHourHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> authorDayHashMap = new HashMap<String, Integer>();
 
     static private Map<String, Integer> sortedLanguageTenMinutesMap;
     static private Map<String, Integer> sortedLanguageHourMap;
     static private Map<String, Integer> sortedLanguageDayMap;
-    static private Map<String, Integer> sortedIdTenMinutesMap;
-    static private Map<String, Integer> sortedIdHourMap;
-    static private Map<String, Integer> sortedIdDayMap;
+    static private Map<String, Integer> sortedRepoNameTenMinutesMap;
+    static private Map<String, Integer> sortedRepoNameHourMap;
+    static private Map<String, Integer> sortedRepoNameDayMap;
+    static private Map<String, Integer> sortedAuthorTenMinutesHashMap;
+    static private Map<String, Integer> sortedAuthorHourHashMap;
+    static private Map<String, Integer> sortedAuthorDayHashMap;
+
 
     public static void main(String[] args) throws InterruptedException {
         final RtmClientBuilder builder = new RtmClientBuilder(endpoint, appkey)
@@ -106,70 +111,40 @@ public class Program {
                             try {
                                 Event event = json.convertToType(Event.class);
                                 String language = event.payload.pull_request.head.repo.language;
-                                String id = event.id;
+                                Commits[] commits = event.payload.commits;
+                                String type = event.type;
+                                String repoName = event.payload.pull_request.head.repo.name;
+
                                 if(languageTenMinutesHashMap.containsKey(language)){
                                     languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
                                 }
                                 else if(!languageTenMinutesHashMap.containsKey(language) && !language.equals("null")){
                                     languageTenMinutesHashMap.put(language, 1);
                                 }
-                                if(idTenMinutesHashMap.containsKey(id)){
-                                    idTenMinutesHashMap.put(id, idTenMinutesHashMap.get(id) + 1);
-                                }
-                                else if(!idTenMinutesHashMap.containsKey(id)){
-                                    idTenMinutesHashMap.put(id, 1);
-                                }
+
+
                             } catch (Exception ignored) {
 
                             }
                         }
                     }
                 });
-
-
-//    ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-//    // configure timed task to publish a message each 2 seconds
-//    executor.scheduleWithFixedDelay(new Runnable() {
-//      public void run() {
-//        double lat = 34.134358 + Math.random();
-//        double lon = -118.321506 + Math.random();
-//        final Animal animal = new Animal("zebra", new double[]{lat, lon});
-//
-//        // At this point, the client may not yet be connected to Satori RTM.
-//        // If the client is not connected, the SDK internally queues the publish request and
-//        // will send it once the client connects
-//        ListenableFuture<Pdu<PublishReply>> reply = client.publish(channel, animal, Ack.YES);
-//
-//        Futures.addCallback(reply, new FutureCallback<Pdu<PublishReply>>() {
-//          public void onSuccess(Pdu<PublishReply> publishReplyPdu) {
-//            System.out.println("Animal is published: " + animal);
-//          }
-//
-//          public void onFailure(Throwable t) {
-//            System.out.println("Publish request failed: " + t.getMessage());
-//          }
-//        });
-//      }
-//    }, 0, 2, TimeUnit.SECONDS);
     }
 
-    /**
-     * Sample model to publish to RTM.
-     *
-     * This class represents the following raw json structure:
-     * <pre>{@literal
-     * {
-     *   "who": "zebra",
-     *   "where": [34.134358, -118.321506]
-     * }
-     * }</pre>
-     */
     static class Event {
         PayLoad payload;
-        String id;
+        Repo repo;
+        String type;
     }
     static class PayLoad{
         PullRequest pull_request;
+        Commits[] commits;
+    }
+    static class Commits{
+        Author author;
+    }
+    static class Author{
+        String name;
     }
     static class PullRequest{
         Head head;
@@ -179,6 +154,7 @@ public class Program {
     }
     static class Repo{
         String language;
+        String name;
     }
 
     static class InputThread implements Runnable {
@@ -187,11 +163,8 @@ public class Program {
             Scanner scanner = new Scanner(System.in);
             while (true) {
                 String command = scanner.nextLine();
-                if (command.equals("top 1")) {
-                    printMap(sortByValue(sortedIdTenMinutesMap));
-                }
-                if (command.equals("top 2")) {
-                    printMap(sortByValue(sortedLanguageTenMinutesMap));
+                if (command.equals("top")) {
+                    printMap(sortedLanguageTenMinutesMap);
                 }
                 try {
                     Thread.sleep(1000);
@@ -206,10 +179,10 @@ public class Program {
             while (true) {
                 try {
                     Thread.sleep(60000);
-                    sortedLanguageTenMinutesMap = sortByValue(languageTenMinutesHashMap);
-                    sortedIdTenMinutesMap = sortByValue(idTenMinutesHashMap);
+                    List<Map.Entry<String, Integer>> languageTenMinutesList =
+                            new LinkedList<Map.Entry<String, Integer>>(languageTenMinutesHashMap.entrySet());
                     languageTenMinutesHashMap = new HashMap<String, Integer>();
-                    idTenMinutesHashMap = new HashMap<String, Integer>();
+                    sortedLanguageTenMinutesMap = sortByValue(languageTenMinutesList);
                 } catch (InterruptedException e) {
                     System.out.println("TenThread interrupted");
                 }
@@ -218,11 +191,7 @@ public class Program {
     }
 
 
-    private static Map<String, Integer> sortByValue (Map<String, Integer> unsortMap) {
-
-        // 1. Convert Map to List of Map
-        List<Map.Entry<String, Integer>> list =
-                new LinkedList<Map.Entry<String, Integer>>(unsortMap.entrySet());
+    private static Map<String, Integer> sortByValue (List<Map.Entry<String, Integer>> list) {
 
         // 2. Sort list with Collections.sort(), provide a custom Comparator
         //    Try switch the o1 o2 position for a different order
@@ -256,6 +225,4 @@ public class Program {
                     + " Value : " + entry.getValue());
         }
     }
-
-
 }
