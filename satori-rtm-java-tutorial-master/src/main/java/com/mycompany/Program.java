@@ -1,4 +1,5 @@
 package com.mycompany;
+
 import com.google.common.util.concurrent.*;
 import com.fasterxml.jackson.annotation.*;
 import com.satori.rtm.*;
@@ -8,6 +9,7 @@ import com.sun.org.apache.regexp.internal.RE;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -38,6 +40,8 @@ public class Program {
     static private Map<String, Integer> sortedAuthorTenMinutesHashMap;
     static private Map<String, Integer> sortedAuthorHourHashMap;
     static private Map<String, Integer> sortedAuthorDayHashMap;
+
+    static private CountDownLatch latch  = new CountDownLatch(0);;
 
 
     public static void main(String[] args) throws InterruptedException {
@@ -110,21 +114,37 @@ public class Program {
                         for (AnyJson json : data.getMessages()) {
                             try {
                                 Event event = json.convertToType(Event.class);
-                                String language = event.payload.pull_request.head.repo.language;
-                                Commits[] commits = event.payload.commits;
                                 String type = event.type;
-                                String repoName = event.payload.pull_request.head.repo.name;
+                                Commits[] commits = event.payload.commits;
+                                String repoName = event.repo.name;
 
-                                if(languageTenMinutesHashMap.containsKey(language)){
-                                    languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
+                                latch.await();
+
+                                if (type.equals("ForkEvent")) {
+                                    if (repoNameTenMinutesHashMap.containsKey(repoName)) {
+                                        repoNameTenMinutesHashMap.put(repoName,repoNameTenMinutesHashMap.get(repoName) + 1);
+                                    }
+                                    else {
+                                        repoNameTenMinutesHashMap.put(repoName, 1);
+                                    }
                                 }
-                                else if(!languageTenMinutesHashMap.containsKey(language) && !language.equals("null")){
+                                for (Commits commit: commits) {
+                                    if (authorTenMinutesHashMap.containsKey(commit.author.name)) {
+                                        authorTenMinutesHashMap.put(commit.author.name,
+                                                authorTenMinutesHashMap.get(commit.author.name) + 1);
+                                    }
+                                    else {
+                                        authorTenMinutesHashMap.put(commit.author.name, 1);
+                                    }
+
+                                }
+                                String language = event.payload.pull_request.head.repo.language;
+                                if (languageTenMinutesHashMap.containsKey(language)) {
+                                    languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
+                                } else if (!language.equals("null")) {
                                     languageTenMinutesHashMap.put(language, 1);
                                 }
-
-
-                            } catch (Exception ignored) {
-
+                            } catch (Exception e) {
                             }
                         }
                     }
@@ -136,23 +156,29 @@ public class Program {
         Repo repo;
         String type;
     }
-    static class PayLoad{
+
+    static class PayLoad {
         PullRequest pull_request;
         Commits[] commits;
     }
-    static class Commits{
+
+    static class Commits {
         Author author;
     }
-    static class Author{
+
+    static class Author {
         String name;
     }
-    static class PullRequest{
+
+    static class PullRequest {
         Head head;
     }
-    static class Head{
+
+    static class Head {
         Repo repo;
     }
-    static class Repo{
+
+    static class Repo {
         String language;
         String name;
     }
@@ -164,7 +190,8 @@ public class Program {
             while (true) {
                 String command = scanner.nextLine();
                 if (command.equals("top")) {
-                    printMap(sortedLanguageTenMinutesMap);
+//                    printMap(sortedLanguageTenMinutesMap);
+//                    printMap(sortedRepoNameTenMinutesMap);
                 }
                 try {
                     Thread.sleep(1000);
@@ -179,10 +206,32 @@ public class Program {
             while (true) {
                 try {
                     Thread.sleep(60000);
+                    latch = new CountDownLatch(1);
                     List<Map.Entry<String, Integer>> languageTenMinutesList =
                             new LinkedList<Map.Entry<String, Integer>>(languageTenMinutesHashMap.entrySet());
+
+                    List<Map.Entry<String, Integer>> repoNameTenMinutesList =
+                            new LinkedList<Map.Entry<String, Integer>>(repoNameTenMinutesHashMap.entrySet());
+
+                    List<Map.Entry<String, Integer>> authorTenMinutesList =
+                            new LinkedList<Map.Entry<String, Integer>>(authorTenMinutesHashMap.entrySet());
+
+
                     languageTenMinutesHashMap = new HashMap<String, Integer>();
+                    repoNameTenMinutesHashMap = new HashMap<String, Integer>();
+                    authorTenMinutesHashMap = new HashMap<String, Integer>();
+
+                    latch.countDown();
+
                     sortedLanguageTenMinutesMap = sortByValue(languageTenMinutesList);
+                    sortedRepoNameTenMinutesMap = sortByValue(repoNameTenMinutesList);
+                    sortedAuthorTenMinutesHashMap = sortByValue(authorTenMinutesList);
+                    printMap(sortedLanguageTenMinutesMap, "");
+                    System.out.println("");
+                    printMap(sortedRepoNameTenMinutesMap, "link");
+                    System.out.println("");
+                    printMap(sortedAuthorTenMinutesHashMap, "link");
+                    System.out.println("");
                 } catch (InterruptedException e) {
                     System.out.println("TenThread interrupted");
                 }
@@ -191,7 +240,7 @@ public class Program {
     }
 
 
-    private static Map<String, Integer> sortByValue (List<Map.Entry<String, Integer>> list) {
+    private static Map<String, Integer> sortByValue(List<Map.Entry<String, Integer>> list) {
 
         // 2. Sort list with Collections.sort(), provide a custom Comparator
         //    Try switch the o1 o2 position for a different order
@@ -219,9 +268,12 @@ public class Program {
         return sortedMap;
     }
 
-    static <K, V> void printMap(Map<K, V> map) {
+    static <K, V> void printMap(Map<K, V> map, String style) {
         for (Map.Entry<K, V> entry : map.entrySet()) {
-            System.out.println("Key : " + entry.getKey()
+            if (style.equals("link")) {
+                System.out.print("https://github.com/");
+            }
+            System.out.println(entry.getKey()
                     + " Value : " + entry.getValue());
         }
     }
