@@ -41,7 +41,8 @@ public class Program {
     static private Map<String, Integer> sortedAuthorHourHashMap;
     static private Map<String, Integer> sortedAuthorDayHashMap;
 
-    static private CountDownLatch latch  = new CountDownLatch(0);;
+    static private CountDownLatch latch = new CountDownLatch(0);
+    ;
 
 
     public static void main(String[] args) throws InterruptedException {
@@ -115,34 +116,35 @@ public class Program {
                             try {
                                 Event event = json.convertToType(Event.class);
                                 String type = event.type;
-                                Commits[] commits = event.payload.commits;
+
                                 String repoName = event.repo.name;
 
                                 latch.await();
 
                                 if (type.equals("ForkEvent")) {
                                     if (repoNameTenMinutesHashMap.containsKey(repoName)) {
-                                        repoNameTenMinutesHashMap.put(repoName,repoNameTenMinutesHashMap.get(repoName) + 1);
-                                    }
-                                    else {
+                                        repoNameTenMinutesHashMap.put(repoName, repoNameTenMinutesHashMap.get(repoName) + 1);
+                                    } else {
                                         repoNameTenMinutesHashMap.put(repoName, 1);
                                     }
-                                }
-                                for (Commits commit: commits) {
-                                    if (authorTenMinutesHashMap.containsKey(commit.author.name)) {
-                                        authorTenMinutesHashMap.put(commit.author.name,
-                                                authorTenMinutesHashMap.get(commit.author.name) + 1);
-                                    }
-                                    else {
-                                        authorTenMinutesHashMap.put(commit.author.name, 1);
-                                    }
+                                } else if (type.equals("PushEvent")) {
+                                    Commits[] commits = event.payload.commits;
+                                    for (Commits commit : commits) {
+                                        if (authorTenMinutesHashMap.containsKey(commit.author.name)) {
+                                            authorTenMinutesHashMap.put(commit.author.name,
+                                                    authorTenMinutesHashMap.get(commit.author.name) + 1);
+                                        } else {
+                                            authorTenMinutesHashMap.put(commit.author.name, 1);
+                                        }
 
-                                }
-                                String language = event.payload.pull_request.head.repo.language;
-                                if (languageTenMinutesHashMap.containsKey(language)) {
-                                    languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
-                                } else if (!language.equals("null")) {
-                                    languageTenMinutesHashMap.put(language, 1);
+                                    }
+                                } else if (type.equals("PullRequestEvent")) {
+                                    String language = event.payload.pull_request.head.repo.language;
+                                    if (languageTenMinutesHashMap.containsKey(language)) {
+                                        languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
+                                    } else if (!language.equals("null")) {
+                                        languageTenMinutesHashMap.put(language, 1);
+                                    }
                                 }
                             } catch (Exception e) {
                             }
@@ -230,7 +232,7 @@ public class Program {
                     System.out.println("");
                     printMap(sortedRepoNameTenMinutesMap, "link");
                     System.out.println("");
-                    printMap(sortedAuthorTenMinutesHashMap, "link");
+                    printMap(sortedAuthorTenMinutesHashMap, "");
                     System.out.println("");
                 } catch (InterruptedException e) {
                     System.out.println("TenThread interrupted");
@@ -250,7 +252,7 @@ public class Program {
                 return (o1.getValue()).compareTo(o2.getValue());
             }
         });
-
+        Collections.reverse(list);
         // 3. Loop the sorted list and put it into a new insertion order Map LinkedHashMap
         Map<String, Integer> sortedMap = new LinkedHashMap<String, Integer>();
         for (Map.Entry<String, Integer> entry : list) {
@@ -269,12 +271,16 @@ public class Program {
     }
 
     static <K, V> void printMap(Map<K, V> map, String style) {
+        int counter = 0;
         for (Map.Entry<K, V> entry : map.entrySet()) {
+            counter++;
             if (style.equals("link")) {
                 System.out.print("https://github.com/");
             }
             System.out.println(entry.getKey()
                     + " Value : " + entry.getValue());
+            if(counter >= 10)
+                break;
         }
     }
 }
