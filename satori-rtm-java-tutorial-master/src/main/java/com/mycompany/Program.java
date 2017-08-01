@@ -1,23 +1,14 @@
 package com.mycompany;
 
 
-import com.google.common.util.concurrent.*;
-import com.fasterxml.jackson.annotation.*;
 import com.satori.rtm.*;
 import com.satori.rtm.auth.*;
 import com.satori.rtm.model.*;
-import com.sun.org.apache.regexp.internal.RE;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
-
-import static jdk.nashorn.internal.runtime.regexp.joni.Syntax.Java;
 
 public class Program {
     static private final String endpoint = "wss://open-data.api.satori.com";
@@ -27,28 +18,18 @@ public class Program {
     static private final String roleSecretKey = "YOUR_SECRET";
     static private final String channel = "github-events";
 
-    static private HashMap<String, Integer> languageTenMinutesHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> languageHourHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> languageDayHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> repoNameTenMinutesHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> repoNameHourHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> repoNameDayHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> authorTenMinutesHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> authorHourHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> authorDayHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> languageMinuteHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> repoNameMinuteHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> authorMinuteHashMap = new HashMap<String, Integer>();
+    static private HashMap<String, Integer> userMinuteHashMap = new HashMap<String, Integer>();
 
-    static private Map<String, Integer> sortedLanguageTenMinutesMap;
-    static private Map<String, Integer> sortedLanguageHourMap;
-    static private Map<String, Integer> sortedLanguageDayMap;
-    static private Map<String, Integer> sortedRepoNameTenMinutesMap;
-    static private Map<String, Integer> sortedRepoNameHourMap;
-    static private Map<String, Integer> sortedRepoNameDayMap;
-    static private Map<String, Integer> sortedAuthorTenMinutesHashMap;
-    static private Map<String, Integer> sortedAuthorHourHashMap;
-    static private Map<String, Integer> sortedAuthorDayHashMap;
+    static private Map<String, Integer> sortedLanguageMinuteMap;
+    static private Map<String, Integer> sortedRepoNameMinuteMap;
+    static private Map<String, Integer> sortedAuthorMinuteHashMap;
+    static private Map<String, Integer> sortedUserMinuteHashMap;
+
 
     static private CountDownLatch latch = new CountDownLatch(0);
-
 
 
     public static void main(String[] args) throws InterruptedException, FileNotFoundException {
@@ -100,8 +81,6 @@ public class Program {
         tt.start();
 
 
-
-
         // At this point, the client may not yet be connected to Satori RTM.
         // If the client is not connected, the SDK internally queues the subscription request and
         // will send it once the client connects
@@ -126,34 +105,62 @@ public class Program {
                             try {
                                 Event event = json.convertToType(Event.class);
                                 String type = event.type;
-                                rawWriter.append("hi");
-                                rawWriter.flush();
                                 latch.await();
-                                String timeStamp = new SimpleDateFormat("yyMMddHHmmSS").format(new java.util.Date());
-                                if (type.equals("ForkEvent")) {
+                                String login = event.actor.login;
+                                if (userMinuteHashMap.containsKey(login)) {
+                                    int size = 1;
+                                    if(type.equals("PushEvent")){
+                                        size =event.payload.commits.length;
+                                    }
+                                    if(size != 0){
+                                        userMinuteHashMap.put(login, userMinuteHashMap.get(login) + 1);
+                                    }
+                                } else {
+                                    userMinuteHashMap.put(login, 1);
+                                }
+                                if (type.equals("ForkEvent") || type.equals("WatchEvent") || type.equals("IssueEvent")) {
                                     String repoName = event.repo.name;
-                                    if (repoNameTenMinutesHashMap.containsKey(repoName)) {
-                                        repoNameTenMinutesHashMap.put(repoName, repoNameTenMinutesHashMap.get(repoName) + 1);
+                                    if (repoNameMinuteHashMap.containsKey(repoName)) {
+                                        if (type.equals("ForkEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, repoNameMinuteHashMap.get(repoName) + 3);
+                                        } else if (type.equals("WatchEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, repoNameMinuteHashMap.get(repoName) + 2);
+                                        } else if (type.equals("IssueEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, repoNameMinuteHashMap.get(repoName) + 1);
+                                        }
                                     } else {
-                                        repoNameTenMinutesHashMap.put(repoName, 1);
+                                        if (type.equals("ForkEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, 3);
+                                        } else if (type.equals("WatchEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, 2);
+                                        } else if (type.equals("IssueEvent")) {
+                                            repoNameMinuteHashMap.put(repoName, 1);
+                                        }
                                     }
                                 } else if (type.equals("PushEvent")) {
                                     Commits[] commits = event.payload.commits;
                                     for (Commits commit : commits) {
-                                        if (authorTenMinutesHashMap.containsKey(commit.author.name)) {
-                                            authorTenMinutesHashMap.put(commit.author.name,
-                                                    authorTenMinutesHashMap.get(commit.author.name) + 1);
+                                        if (authorMinuteHashMap.containsKey(commit.author.email)) {
+                                            authorMinuteHashMap.put(commit.author.email,
+                                                    authorMinuteHashMap.get(commit.author.email) + 1);
                                         } else {
-                                            authorTenMinutesHashMap.put(commit.author.name, 1);
+                                            authorMinuteHashMap.put(commit.author.email, 1);
                                         }
-
                                     }
+                                } else if (type.equals("IssueEvent")) {
+                                    String login2 = event.payload.issue.user.login;
+                                    if (userMinuteHashMap.containsKey(login2)) {
+                                        userMinuteHashMap.put(login2, userMinuteHashMap.get(login2) + 1);
+                                    } else {
+                                        userMinuteHashMap.put(login2, 1);
+                                    }
+
                                 } else if (type.equals("PullRequestEvent")) {
                                     String language = event.payload.pull_request.head.repo.language;
-                                    if (languageTenMinutesHashMap.containsKey(language)) {
-                                        languageTenMinutesHashMap.put(language, languageTenMinutesHashMap.get(language) + 1);
+                                    if (languageMinuteHashMap.containsKey(language)) {
+                                        languageMinuteHashMap.put(language, languageMinuteHashMap.get(language) + 1);
                                     } else if (!language.equals("null")) {
-                                        languageTenMinutesHashMap.put(language, 1);
+                                        languageMinuteHashMap.put(language, 1);
                                     }
                                 }
                             } catch (Exception ignore) {
@@ -167,11 +174,27 @@ public class Program {
         PayLoad payload;
         Repo repo;
         String type;
+        Actor actor;
+    }
+
+
+    static class Actor {
+        String login;
     }
 
     static class PayLoad {
         PullRequest pull_request;
         Commits[] commits;
+        Issue issue;
+
+    }
+
+    static class Issue {
+        User user;
+    }
+
+    static class User {
+        String login;
     }
 
     static class Commits {
@@ -179,7 +202,7 @@ public class Program {
     }
 
     static class Author {
-        String name;
+        String email;
     }
 
     static class PullRequest {
@@ -202,8 +225,8 @@ public class Program {
             while (true) {
                 String command = scanner.nextLine();
                 if (command.equals("top")) {
-//                    printMap(sortedLanguageTenMinutesMap);
-//                    printMap(sortedRepoNameTenMinutesMap);
+//                    printMap(sortedLanguageMinuteMap);
+//                    printMap(sortedRepoNameMinuteMap);
                 }
                 try {
                     Thread.sleep(1000);
@@ -219,31 +242,37 @@ public class Program {
                 try {
                     Thread.sleep(60000);
                     latch = new CountDownLatch(1);
-                    List<Map.Entry<String, Integer>> languageTenMinutesList =
-                            new LinkedList<Map.Entry<String, Integer>>(languageTenMinutesHashMap.entrySet());
+                    List<Map.Entry<String, Integer>> languageMinuteList =
+                            new LinkedList<Map.Entry<String, Integer>>(languageMinuteHashMap.entrySet());
 
-                    List<Map.Entry<String, Integer>> repoNameTenMinutesList =
-                            new LinkedList<Map.Entry<String, Integer>>(repoNameTenMinutesHashMap.entrySet());
+                    List<Map.Entry<String, Integer>> repoNameMinuteList =
+                            new LinkedList<Map.Entry<String, Integer>>(repoNameMinuteHashMap.entrySet());
 
-                    List<Map.Entry<String, Integer>> authorTenMinutesList =
-                            new LinkedList<Map.Entry<String, Integer>>(authorTenMinutesHashMap.entrySet());
+                    List<Map.Entry<String, Integer>> authorMinuteList =
+                            new LinkedList<Map.Entry<String, Integer>>(authorMinuteHashMap.entrySet());
+                    List<Map.Entry<String, Integer>> userMinuteList =
+                            new LinkedList<Map.Entry<String, Integer>>(userMinuteHashMap.entrySet());
 
-
-                    languageTenMinutesHashMap = new HashMap<String, Integer>();
-                    repoNameTenMinutesHashMap = new HashMap<String, Integer>();
-                    authorTenMinutesHashMap = new HashMap<String, Integer>();
+                    languageMinuteHashMap = new HashMap<String, Integer>();
+                    repoNameMinuteHashMap = new HashMap<String, Integer>();
+                    authorMinuteHashMap = new HashMap<String, Integer>();
+                    userMinuteHashMap = new HashMap<String, Integer>();
 
                     latch.countDown();
 
-                    sortedLanguageTenMinutesMap = sortByValue(languageTenMinutesList);
-                    sortedRepoNameTenMinutesMap = sortByValue(repoNameTenMinutesList);
-                    sortedAuthorTenMinutesHashMap = sortByValue(authorTenMinutesList);
-                    printMap(sortedLanguageTenMinutesMap, "");
-                    System.out.println("");
-                    printMap(sortedRepoNameTenMinutesMap, "link");
-                    System.out.println("");
-                    printMap(sortedAuthorTenMinutesHashMap, "");
-                    System.out.println("");
+                    sortedLanguageMinuteMap = sortByValue(languageMinuteList);
+                    sortedRepoNameMinuteMap = sortByValue(repoNameMinuteList);
+                    sortedAuthorMinuteHashMap = sortByValue(authorMinuteList);
+                    sortedUserMinuteHashMap = sortByValue(userMinuteList);
+
+                    printMap(sortedLanguageMinuteMap, "");
+
+                    printMap(sortedRepoNameMinuteMap, "link");
+
+                    printMap(sortedAuthorMinuteHashMap, "");
+
+                    printMap(sortedUserMinuteHashMap, "link");
+
                 } catch (InterruptedException e) {
                     System.out.println("TenThread interrupted");
                 }
@@ -257,8 +286,7 @@ public class Program {
         // 2. Sort list with Collections.sort(), provide a custom Comparator
         //    Try switch the o1 o2 position for a different order
         Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
-            public int compare(Map.Entry<String, Integer> o1,
-                               Map.Entry<String, Integer> o2) {
+            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
                 return (o1.getValue()).compareTo(o2.getValue());
             }
         });
@@ -276,21 +304,21 @@ public class Program {
             sortedMap.put(entry.getKey(), entry.getValue());
         }*/
 
-
         return sortedMap;
     }
 
-    static <K, V> void printMap(Map<K, V> map, String style) {
+    static <K, V> void printMap(Map<K, V> map, String style)  {
         int counter = 0;
         for (Map.Entry<K, V> entry : map.entrySet()) {
             counter++;
             if (style.equals("link")) {
                 System.out.print("https://github.com/");
             }
-            System.out.println(entry.getKey()
-                    + " Value : " + entry.getValue());
-            if(counter >= 10)
+            System.out.println(entry.getKey() + ": " + entry.getValue());
+
+            if (counter >= 10)
                 break;
         }
+        System.out.println("");
     }
 }
