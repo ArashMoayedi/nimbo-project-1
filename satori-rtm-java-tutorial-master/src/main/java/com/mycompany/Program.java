@@ -1,5 +1,6 @@
 package com.mycompany;
 
+
 import com.google.common.util.concurrent.*;
 import com.fasterxml.jackson.annotation.*;
 import com.satori.rtm.*;
@@ -10,8 +11,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
+
+import static jdk.nashorn.internal.runtime.regexp.joni.Syntax.Java;
 
 public class Program {
     static private final String endpoint = "wss://open-data.api.satori.com";
@@ -42,10 +48,11 @@ public class Program {
     static private Map<String, Integer> sortedAuthorDayHashMap;
 
     static private CountDownLatch latch = new CountDownLatch(0);
-    ;
 
 
-    public static void main(String[] args) throws InterruptedException {
+
+    public static void main(String[] args) throws InterruptedException, FileNotFoundException {
+        final PrintWriter rawWriter = new PrintWriter("raw.txt");
         final RtmClientBuilder builder = new RtmClientBuilder(endpoint, appkey)
                 .setListener(new RtmClientAdapter() {
                     @Override
@@ -92,6 +99,9 @@ public class Program {
         Thread tt = new Thread(tenThread);
         tt.start();
 
+
+
+
         // At this point, the client may not yet be connected to Satori RTM.
         // If the client is not connected, the SDK internally queues the subscription request and
         // will send it once the client connects
@@ -116,12 +126,12 @@ public class Program {
                             try {
                                 Event event = json.convertToType(Event.class);
                                 String type = event.type;
-
-                                String repoName = event.repo.name;
-
+                                rawWriter.append("hi");
+                                rawWriter.flush();
                                 latch.await();
-
+                                String timeStamp = new SimpleDateFormat("yyMMddHHmmSS").format(new java.util.Date());
                                 if (type.equals("ForkEvent")) {
+                                    String repoName = event.repo.name;
                                     if (repoNameTenMinutesHashMap.containsKey(repoName)) {
                                         repoNameTenMinutesHashMap.put(repoName, repoNameTenMinutesHashMap.get(repoName) + 1);
                                     } else {
@@ -146,7 +156,7 @@ public class Program {
                                         languageTenMinutesHashMap.put(language, 1);
                                     }
                                 }
-                            } catch (Exception e) {
+                            } catch (Exception ignore) {
                             }
                         }
                     }
