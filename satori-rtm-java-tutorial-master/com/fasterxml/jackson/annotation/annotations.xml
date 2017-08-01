@@ -1,0 +1,5 @@
+<root>
+    <item name='com.fasterxml.jackson.annotation.JsonProperty'>
+        <annotation name='java.lang.Deprecated'/>
+    </item>
+</root>
