@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/nimbo-project-1.iml" filepath="$PROJECT_DIR$/.idea/nimbo-project-1.iml" />
+      <module fileurl="file://$PROJECT_DIR$/satori-rtm-java-tutorial-master/satori-tutorial.iml" filepath="$PROJECT_DIR$/satori-rtm-java-tutorial-master/satori-tutorial.iml" />
     </modules>
   </component>
 </project>

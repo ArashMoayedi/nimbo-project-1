@@ -6,6 +6,7 @@ import com.satori.rtm.auth.*;
 import com.satori.rtm.model.*;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
@@ -31,9 +32,25 @@ public class Program {
 
     static private CountDownLatch latch = new CountDownLatch(0);
 
+    static File languageDir = new File("languages");
+    static File authorDir = new File("authors");
+    static File repoDir = new File("repos");
+    static File userDir = new File("users");
 
     public static void main(String[] args) throws InterruptedException, FileNotFoundException {
-        final PrintWriter rawWriter = new PrintWriter("raw.txt");
+
+        File logDir = new File("logs");
+        logDir.mkdir();
+        final PrintWriter logWriter = new PrintWriter(new FileOutputStream(
+                new File(logDir, "log.txt"),
+                true
+        ));
+        authorDir.mkdir();
+        languageDir.mkdir();
+        repoDir.mkdir();
+        userDir.mkdir();
+
+
         final RtmClientBuilder builder = new RtmClientBuilder(endpoint, appkey)
                 .setListener(new RtmClientAdapter() {
                     @Override
@@ -106,11 +123,14 @@ public class Program {
                                 Event event = json.convertToType(Event.class);
                                 String type = event.type;
                                 latch.await();
+                                String timeStamp = new SimpleDateFormat("yyMMddHHmmSS").format(new java.util.Date());
+                                logWriter.append(timeStamp).append(" : Type: ").append(type);
                                 String login = event.actor.login;
+                                logWriter.append(" Actor_Login: ").append(login);
                                 if (userMinuteHashMap.containsKey(login)) {
                                     int size = 1;
                                     if(type.equals("PushEvent")){
-                                        size =event.payload.commits.length;
+                                        size = event.payload.commits.length;
                                     }
                                     if(size != 0){
                                         userMinuteHashMap.put(login, userMinuteHashMap.get(login) + 1);
@@ -120,6 +140,7 @@ public class Program {
                                 }
                                 if (type.equals("ForkEvent") || type.equals("WatchEvent") || type.equals("IssueEvent")) {
                                     String repoName = event.repo.name;
+                                    logWriter.append(" Repo_Name: ").append(repoName);
                                     if (repoNameMinuteHashMap.containsKey(repoName)) {
                                         if (type.equals("ForkEvent")) {
                                             repoNameMinuteHashMap.put(repoName, repoNameMinuteHashMap.get(repoName) + 3);
@@ -139,7 +160,9 @@ public class Program {
                                     }
                                 } else if (type.equals("PushEvent")) {
                                     Commits[] commits = event.payload.commits;
+                                    logWriter.append(" Authors: ");
                                     for (Commits commit : commits) {
+                                        logWriter.append("Name: ").append(commit.author.name).append(" Email: ").append(commit.author.email).append(" || ");
                                         if (authorMinuteHashMap.containsKey(commit.author.email)) {
                                             authorMinuteHashMap.put(commit.author.email,
                                                     authorMinuteHashMap.get(commit.author.email) + 1);
@@ -149,6 +172,7 @@ public class Program {
                                     }
                                 } else if (type.equals("IssueEvent")) {
                                     String login2 = event.payload.issue.user.login;
+                                    logWriter.append("Action: ").append(event.payload.action);
                                     if (userMinuteHashMap.containsKey(login2)) {
                                         userMinuteHashMap.put(login2, userMinuteHashMap.get(login2) + 1);
                                     } else {
@@ -157,12 +181,14 @@ public class Program {
 
                                 } else if (type.equals("PullRequestEvent")) {
                                     String language = event.payload.pull_request.head.repo.language;
+                                    logWriter.append(" Language: ").append(language);
                                     if (languageMinuteHashMap.containsKey(language)) {
                                         languageMinuteHashMap.put(language, languageMinuteHashMap.get(language) + 1);
                                     } else if (!language.equals("null")) {
                                         languageMinuteHashMap.put(language, 1);
                                     }
                                 }
+                                logWriter.append("\n");
                             } catch (Exception ignore) {
                             }
                         }
@@ -186,6 +212,7 @@ public class Program {
         PullRequest pull_request;
         Commits[] commits;
         Issue issue;
+        String action;
 
     }
 
@@ -203,6 +230,7 @@ public class Program {
 
     static class Author {
         String email;
+        String name;
     }
 
     static class PullRequest {
@@ -223,10 +251,13 @@ public class Program {
             System.out.println("Input your command:");
             Scanner scanner = new Scanner(System.in);
             while (true) {
-                String command = scanner.nextLine();
-                if (command.equals("top")) {
-//                    printMap(sortedLanguageMinuteMap);
-//                    printMap(sortedRepoNameMinuteMap);
+                String from = scanner.nextLine();
+                String to = scanner.nextLine();
+                String need = scanner.nextLine();
+                try {
+                    dataAnalysis(from, to, need);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
                 try {
                     Thread.sleep(1000);
@@ -241,7 +272,11 @@ public class Program {
             while (true) {
                 try {
                     Thread.sleep(60000);
+
+                    String timeStamp = new SimpleDateFormat("yyMMddHHmm").format(new java.util.Date());
+
                     latch = new CountDownLatch(1);
+
                     List<Map.Entry<String, Integer>> languageMinuteList =
                             new LinkedList<Map.Entry<String, Integer>>(languageMinuteHashMap.entrySet());
 
@@ -250,6 +285,7 @@ public class Program {
 
                     List<Map.Entry<String, Integer>> authorMinuteList =
                             new LinkedList<Map.Entry<String, Integer>>(authorMinuteHashMap.entrySet());
+
                     List<Map.Entry<String, Integer>> userMinuteList =
                             new LinkedList<Map.Entry<String, Integer>>(userMinuteHashMap.entrySet());
 
@@ -265,13 +301,18 @@ public class Program {
                     sortedAuthorMinuteHashMap = sortByValue(authorMinuteList);
                     sortedUserMinuteHashMap = sortByValue(userMinuteList);
 
-                    printMap(sortedLanguageMinuteMap, "");
+                    File languageFile = new File(languageDir, timeStamp);
+                    printMap(sortedLanguageMinuteMap, "", languageFile);
 
-                    printMap(sortedRepoNameMinuteMap, "link");
+                    File repoFile = new File(repoDir, timeStamp);
+                    printMap(sortedRepoNameMinuteMap, "link", repoFile);
 
-                    printMap(sortedAuthorMinuteHashMap, "");
+                    File authorFile = new File(authorDir, timeStamp);
+                    printMap(sortedAuthorMinuteHashMap, "", authorFile);
 
-                    printMap(sortedUserMinuteHashMap, "link");
+                    File userFile = new File(userDir, timeStamp);
+                    printMap(sortedUserMinuteHashMap, "link", userFile);
+
 
                 } catch (InterruptedException e) {
                     System.out.println("TenThread interrupted");
@@ -283,42 +324,79 @@ public class Program {
 
     private static Map<String, Integer> sortByValue(List<Map.Entry<String, Integer>> list) {
 
-        // 2. Sort list with Collections.sort(), provide a custom Comparator
-        //    Try switch the o1 o2 position for a different order
         Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
             public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
                 return (o1.getValue()).compareTo(o2.getValue());
             }
         });
+
         Collections.reverse(list);
-        // 3. Loop the sorted list and put it into a new insertion order Map LinkedHashMap
+
         Map<String, Integer> sortedMap = new LinkedHashMap<String, Integer>();
+
         for (Map.Entry<String, Integer> entry : list) {
             sortedMap.put(entry.getKey(), entry.getValue());
         }
 
-        /*
-        //classic iterator example
-        for (Iterator<Map.Entry<String, Integer>> it = list.iterator(); it.hasNext(); ) {
-            Map.Entry<String, Integer> entry = it.next();
-            sortedMap.put(entry.getKey(), entry.getValue());
-        }*/
-
         return sortedMap;
     }
 
-    static <K, V> void printMap(Map<K, V> map, String style)  {
-        int counter = 0;
-        for (Map.Entry<K, V> entry : map.entrySet()) {
-            counter++;
-            if (style.equals("link")) {
-                System.out.print("https://github.com/");
-            }
-            System.out.println(entry.getKey() + ": " + entry.getValue());
+    static <K, V> void printMap(Map<K, V> map, String style, File outputFile) {
 
-            if (counter >= 10)
-                break;
+        try {
+            final PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outputFile), Charset.forName("UTF-8")));
+            for (Map.Entry<K, V> entry : map.entrySet()) {
+                if (style.equals("link")) {
+                    writer.append("https://github.com/");
+                }
+                writer.append(String.valueOf(entry.getKey())).append("^").append(String.valueOf(entry.getValue())).append("\n");
+                writer.flush();
+            }
+            writer.close();
+        } catch (Exception ignored) {
+
         }
-        System.out.println("");
+    }
+    static void dataAnalysis(String from, String to, String need) throws IOException {
+
+        HashMap<String, Integer> resultMap = new HashMap<String, Integer>();
+        BufferedReader dataReader = null;
+        String line;
+        boolean caughtException = false;
+        for (int i = Integer.parseInt(from); i <= Integer.parseInt(to); i++) {
+            try {
+                dataReader = new BufferedReader(new FileReader(need + "/" + Integer.toString(i)));
+            } catch (FileNotFoundException e) {
+                if (!caughtException) {
+                    System.out.println("Not enough data, continue analysing? [y/n]");
+                    Scanner scanner = new Scanner(System.in);
+                    String command = scanner.nextLine();
+                    if (command.equals("n")) {
+                        System.out.println("Aborted!");
+                        break;
+                    }
+                    caughtException = true;
+                }
+            }
+            while ((line = dataReader.readLine()) != null)
+            {
+                String[] parts = line.split("\\^", 2);
+                if (parts.length >= 2)
+                {
+                    String key = parts[0];
+                    int value = Integer.parseInt(parts[1]);
+                    if (resultMap.containsKey(key)) {
+                        resultMap.put(key, resultMap.get(key) + value);
+                    } else {
+                        resultMap.put(key, value);
+                    }
+                } else {
+                    System.out.println("ignoring line: " + line);
+                }
+            }
+        }
+        List<Map.Entry<String, Integer>> resultList =
+                new LinkedList<Map.Entry<String, Integer>>(resultMap.entrySet());
+        printMap(sortByValue(resultList), "", new File(from + "-" + to + "-" + need));
     }
 }
