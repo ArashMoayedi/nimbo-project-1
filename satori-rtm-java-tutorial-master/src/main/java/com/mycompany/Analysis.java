@@ -19,7 +19,6 @@ public class Analysis {
         boolean caughtException = false;
         try {
             from = from.replaceAll("[^\\d]", "");
-            System.out.println(from);
             to = to.replaceAll("[^\\d]", "");
             long start = Long.parseLong(from);
             long end = Long.parseLong(to);
