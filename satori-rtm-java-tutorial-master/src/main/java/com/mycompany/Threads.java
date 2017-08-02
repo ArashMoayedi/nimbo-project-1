@@ -10,7 +10,7 @@ import java.util.concurrent.CountDownLatch;
 import static com.mycompany.DataMap.printMap;
 import static com.mycompany.Program.*;
 
-public class Theards {
+public class Threads {
 
     static class InputThread implements Runnable {
         public void run() {

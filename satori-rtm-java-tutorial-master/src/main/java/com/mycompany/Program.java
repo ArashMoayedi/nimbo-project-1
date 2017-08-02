@@ -29,10 +29,11 @@ public class Program {
     static File authorDir = new File("authors");
     static File repoDir = new File("repos");
     static File userDir = new File("users");
+    static File logDir = new File("logs");
 
     public static void main(String[] args) throws InterruptedException, FileNotFoundException {
 
-        File logDir = new File("logs");
+
         logDir.mkdir();
         final PrintWriter logWriter = new PrintWriter(new FileOutputStream(
                 new File(logDir, "log.txt"),
@@ -82,11 +83,11 @@ public class Program {
 
         client.start();
 
-        Theards.InputThread inputThread = new Theards.InputThread();
+        Threads.InputThread inputThread = new Threads.InputThread();
         Thread t = new Thread(inputThread);
         t.start();
 
-        Theards.TenThread tenThread = new Theards.TenThread();
+        Threads.TenThread tenThread = new Threads.TenThread();
         Thread tt = new Thread(tenThread);
         tt.start();
 
