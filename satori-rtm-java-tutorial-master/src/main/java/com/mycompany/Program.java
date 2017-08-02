@@ -6,7 +6,6 @@ import com.satori.rtm.auth.*;
 import com.satori.rtm.model.*;
 
 import java.io.*;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
@@ -19,18 +18,12 @@ public class Program {
     static private final String roleSecretKey = "YOUR_SECRET";
     static private final String channel = "github-events";
 
-    static private HashMap<String, Integer> languageMinuteHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> repoNameMinuteHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> authorMinuteHashMap = new HashMap<String, Integer>();
-    static private HashMap<String, Integer> userMinuteHashMap = new HashMap<String, Integer>();
+    static HashMap<String, Integer> languageMinuteHashMap = new HashMap<String, Integer>();
+    static HashMap<String, Integer> repoNameMinuteHashMap = new HashMap<String, Integer>();
+    static HashMap<String, Integer> authorMinuteHashMap = new HashMap<String, Integer>();
+    static HashMap<String, Integer> userMinuteHashMap = new HashMap<String, Integer>();
 
-    static private Map<String, Integer> sortedLanguageMinuteMap;
-    static private Map<String, Integer> sortedRepoNameMinuteMap;
-    static private Map<String, Integer> sortedAuthorMinuteHashMap;
-    static private Map<String, Integer> sortedUserMinuteHashMap;
-
-
-    static private CountDownLatch latch = new CountDownLatch(0);
+    static CountDownLatch latch = new CountDownLatch(0);
 
     static File languageDir = new File("languages");
     static File authorDir = new File("authors");
@@ -89,11 +82,11 @@ public class Program {
 
         client.start();
 
-        InputThread inputThread = new InputThread();
+        Theards.InputThread inputThread = new Theards.InputThread();
         Thread t = new Thread(inputThread);
         t.start();
 
-        TenThread tenThread = new TenThread();
+        Theards.TenThread tenThread = new Theards.TenThread();
         Thread tt = new Thread(tenThread);
         tt.start();
 
@@ -123,16 +116,16 @@ public class Program {
                                 Event event = json.convertToType(Event.class);
                                 String type = event.type;
                                 latch.await();
-                                String timeStamp = new SimpleDateFormat("yyMMddHHmmSS").format(new java.util.Date());
+                                String timeStamp = new SimpleDateFormat("yyyyMMddHHmmSS").format(new java.util.Date());
                                 logWriter.append(timeStamp).append(" : Type: ").append(type);
                                 String login = event.actor.login;
                                 logWriter.append(" Actor_Login: ").append(login);
                                 if (userMinuteHashMap.containsKey(login)) {
                                     int size = 1;
-                                    if(type.equals("PushEvent")){
+                                    if (type.equals("PushEvent")) {
                                         size = event.payload.commits.length;
                                     }
-                                    if(size != 0){
+                                    if (size != 0) {
                                         userMinuteHashMap.put(login, userMinuteHashMap.get(login) + 1);
                                     }
                                 } else {
@@ -194,209 +187,5 @@ public class Program {
                         }
                     }
                 });
-    }
-
-    static class Event {
-        PayLoad payload;
-        Repo repo;
-        String type;
-        Actor actor;
-    }
-
-
-    static class Actor {
-        String login;
-    }
-
-    static class PayLoad {
-        PullRequest pull_request;
-        Commits[] commits;
-        Issue issue;
-        String action;
-
-    }
-
-    static class Issue {
-        User user;
-    }
-
-    static class User {
-        String login;
-    }
-
-    static class Commits {
-        Author author;
-    }
-
-    static class Author {
-        String email;
-        String name;
-    }
-
-    static class PullRequest {
-        Head head;
-    }
-
-    static class Head {
-        Repo repo;
-    }
-
-    static class Repo {
-        String language;
-        String name;
-    }
-
-    static class InputThread implements Runnable {
-        public void run() {
-            System.out.println("Input your command:");
-            Scanner scanner = new Scanner(System.in);
-            while (true) {
-                String from = scanner.nextLine();
-                String to = scanner.nextLine();
-                String need = scanner.nextLine();
-                try {
-                    dataAnalysis(from, to, need);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                }
-            }
-        }
-    }
-
-    static class TenThread implements Runnable {
-        public void run() {
-            while (true) {
-                try {
-                    Thread.sleep(60000);
-
-                    String timeStamp = new SimpleDateFormat("yyMMddHHmm").format(new java.util.Date());
-
-                    latch = new CountDownLatch(1);
-
-                    List<Map.Entry<String, Integer>> languageMinuteList =
-                            new LinkedList<Map.Entry<String, Integer>>(languageMinuteHashMap.entrySet());
-
-                    List<Map.Entry<String, Integer>> repoNameMinuteList =
-                            new LinkedList<Map.Entry<String, Integer>>(repoNameMinuteHashMap.entrySet());
-
-                    List<Map.Entry<String, Integer>> authorMinuteList =
-                            new LinkedList<Map.Entry<String, Integer>>(authorMinuteHashMap.entrySet());
-
-                    List<Map.Entry<String, Integer>> userMinuteList =
-                            new LinkedList<Map.Entry<String, Integer>>(userMinuteHashMap.entrySet());
-
-                    languageMinuteHashMap = new HashMap<String, Integer>();
-                    repoNameMinuteHashMap = new HashMap<String, Integer>();
-                    authorMinuteHashMap = new HashMap<String, Integer>();
-                    userMinuteHashMap = new HashMap<String, Integer>();
-
-                    latch.countDown();
-
-                    sortedLanguageMinuteMap = sortByValue(languageMinuteList);
-                    sortedRepoNameMinuteMap = sortByValue(repoNameMinuteList);
-                    sortedAuthorMinuteHashMap = sortByValue(authorMinuteList);
-                    sortedUserMinuteHashMap = sortByValue(userMinuteList);
-
-                    File languageFile = new File(languageDir, timeStamp);
-                    printMap(sortedLanguageMinuteMap, "", languageFile);
-
-                    File repoFile = new File(repoDir, timeStamp);
-                    printMap(sortedRepoNameMinuteMap, "link", repoFile);
-
-                    File authorFile = new File(authorDir, timeStamp);
-                    printMap(sortedAuthorMinuteHashMap, "", authorFile);
-
-                    File userFile = new File(userDir, timeStamp);
-                    printMap(sortedUserMinuteHashMap, "link", userFile);
-
-
-                } catch (InterruptedException e) {
-                    System.out.println("TenThread interrupted");
-                }
-            }
-        }
-    }
-
-
-    private static Map<String, Integer> sortByValue(List<Map.Entry<String, Integer>> list) {
-
-        Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
-            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
-                return (o1.getValue()).compareTo(o2.getValue());
-            }
-        });
-
-        Collections.reverse(list);
-
-        Map<String, Integer> sortedMap = new LinkedHashMap<String, Integer>();
-
-        for (Map.Entry<String, Integer> entry : list) {
-            sortedMap.put(entry.getKey(), entry.getValue());
-        }
-
-        return sortedMap;
-    }
-
-    static <K, V> void printMap(Map<K, V> map, String style, File outputFile) {
-
-        try {
-            final PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outputFile), Charset.forName("UTF-8")));
-            for (Map.Entry<K, V> entry : map.entrySet()) {
-                if (style.equals("link")) {
-                    writer.append("https://github.com/");
-                }
-                writer.append(String.valueOf(entry.getKey())).append("^").append(String.valueOf(entry.getValue())).append("\n");
-                writer.flush();
-            }
-            writer.close();
-        } catch (Exception ignored) {
-
-        }
-    }
-    static void dataAnalysis(String from, String to, String need) throws IOException {
-
-        HashMap<String, Integer> resultMap = new HashMap<String, Integer>();
-        BufferedReader dataReader = null;
-        String line;
-        boolean caughtException = false;
-        for (int i = Integer.parseInt(from); i <= Integer.parseInt(to); i++) {
-            try {
-                dataReader = new BufferedReader(new FileReader(need + "/" + Integer.toString(i)));
-            } catch (FileNotFoundException e) {
-                if (!caughtException) {
-                    System.out.println("Not enough data, continue analysing? [y/n]");
-                    Scanner scanner = new Scanner(System.in);
-                    String command = scanner.nextLine();
-                    if (command.equals("n")) {
-                        System.out.println("Aborted!");
-                        break;
-                    }
-                    caughtException = true;
-                }
-            }
-            while ((line = dataReader.readLine()) != null)
-            {
-                String[] parts = line.split("\\^", 2);
-                if (parts.length >= 2)
-                {
-                    String key = parts[0];
-                    int value = Integer.parseInt(parts[1]);
-                    if (resultMap.containsKey(key)) {
-                        resultMap.put(key, resultMap.get(key) + value);
-                    } else {
-                        resultMap.put(key, value);
-                    }
-                } else {
-                    System.out.println("ignoring line: " + line);
-                }
-            }
-        }
-        List<Map.Entry<String, Integer>> resultList =
-                new LinkedList<Map.Entry<String, Integer>>(resultMap.entrySet());
-        printMap(sortByValue(resultList), "", new File(from + "-" + to + "-" + need));
     }
 }
