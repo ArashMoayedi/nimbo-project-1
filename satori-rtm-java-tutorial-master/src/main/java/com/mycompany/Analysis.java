@@ -17,47 +17,48 @@ public class Analysis {
         BufferedReader dataReader = null;
         String line;
         boolean caughtException = false;
-        try{
-        long start = Long.parseLong(from);
-        long end = Long.parseLong(to);
-        for (; start <= end; start++) {
-            try {
-                dataReader = new BufferedReader(new FileReader(need + "/" + Long.toString(start)));
-            } catch (FileNotFoundException e) {
-                if (!caughtException) {
-                    System.out.println("Not enough data, continue analysing? [y/n]");
-                    Scanner scanner = new Scanner(System.in);
-                    String command = scanner.nextLine();
-                    if (command.equals("n")) {
-                        System.out.println("Aborted!");
-                        break;
+        try {
+            from = from.replaceAll("[^\\d]", "");
+            System.out.println(from);
+            to = to.replaceAll("[^\\d]", "");
+            long start = Long.parseLong(from);
+            long end = Long.parseLong(to);
+            for (; start <= end; start++) {
+                try {
+                    dataReader = new BufferedReader(new FileReader(need + "/" + Long.toString(start)));
+                } catch (FileNotFoundException e) {
+                    if (!caughtException) {
+                        System.out.println("Not enough data, continue analysing? [y/n]");
+                        Scanner scanner = new Scanner(System.in);
+                        String command = scanner.nextLine();
+                        if (command.equals("n")) {
+                            System.out.println("Aborted!");
+                            break;
+                        }
+                        caughtException = true;
                     }
-                    caughtException = true;
                 }
-            }
-            while ((line = dataReader.readLine()) != null)
-            {
-                String[] parts = line.split("\\^", 2);
-                if (parts.length >= 2)
-                {
-                    String key = parts[0];
-                    int value = Integer.parseInt(parts[1]);
-                    if (resultMap.containsKey(key)) {
-                        resultMap.put(key, resultMap.get(key) + value);
+                while ((line = dataReader.readLine()) != null) {
+                    String[] parts = line.split("\\^", 2);
+                    if (parts.length >= 2) {
+                        String key = parts[0];
+                        int value = Integer.parseInt(parts[1]);
+                        if (resultMap.containsKey(key)) {
+                            resultMap.put(key, resultMap.get(key) + value);
+                        } else {
+                            resultMap.put(key, value);
+                        }
                     } else {
-                        resultMap.put(key, value);
+                        System.out.println("ignoring line: " + line);
                     }
-                } else {
-                    System.out.println("ignoring line: " + line);
                 }
             }
+            List<Map.Entry<String, Integer>> resultList =
+                    new LinkedList<Map.Entry<String, Integer>>(resultMap.entrySet());
+            printMap(sortByValue(resultList), "", new File(from + "-" + to + "-" + need));
+        } catch (Exception ignore) {
+            System.out.println("Invalid inputs");
         }
-        List<Map.Entry<String, Integer>> resultList =
-                new LinkedList<Map.Entry<String, Integer>>(resultMap.entrySet());
-       printMap(sortByValue(resultList), "", new File(from + "-" + to + "-" + need));
-    }
-    catch (Exception ignore){
-        System.out.println("Invalid inputs"); }
     }
 
 }

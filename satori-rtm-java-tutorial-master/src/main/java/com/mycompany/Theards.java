@@ -45,7 +45,6 @@ public class Theards {
 
                     latch.countDown();
 
-
                     File languageFile = new File(languageDir, timeStamp);
                     printMap(languageMinuteHashMap, "", languageFile);
 
